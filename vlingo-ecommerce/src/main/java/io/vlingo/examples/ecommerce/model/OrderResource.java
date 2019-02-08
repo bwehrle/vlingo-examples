@@ -4,7 +4,6 @@ import io.vlingo.actors.*;
 import io.vlingo.common.Completes;
 import io.vlingo.http.Response;
 import io.vlingo.http.resource.Resource;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -45,7 +44,10 @@ public class OrderResource {
     }
 
     private Completes<Response> postPayment(String orderId, PaymentId paymentId) {
-        throw new NotImplementedException();
+        return stage.actorOf(Order.class, addressFactory.from(orderId))
+                    .andThen(actor -> {actor.paymentComplete(paymentId); return actor;})
+                    .andThenTo(actor -> Completes.withSuccess(Response.of(Ok, "")))
+                    .otherwise(noOrder -> Response.of(NotFound, urlLocation(orderId)));
     }
 
     private Completes<Response> queryOrder(String orderId) {
@@ -68,7 +70,7 @@ public class OrderResource {
                 get(ROOT_URL + "/{orderId}")
                         .param(String.class)
                         .handle(this::queryOrder),
-                post(ROOT_URL + "/{cartId}/payment")
+                post(ROOT_URL + "/{orderId}/payment")
                         .param(String.class)
                         .body(PaymentId.class)
                         .handle(this::postPayment));

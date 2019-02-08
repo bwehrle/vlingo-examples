@@ -7,6 +7,8 @@ import io.vlingo.examples.ecommerce.infra.cart.CartAllItemsRemoveEventAdapter;
 import io.vlingo.examples.ecommerce.infra.cart.CartCreatedEventAdapter;
 import io.vlingo.examples.ecommerce.infra.cart.CartProductQuantityChangedEventAdapter;
 import io.vlingo.examples.ecommerce.infra.order.OrderCreatedEventAdapter;
+import io.vlingo.examples.ecommerce.infra.order.PaymentReceivedEventAdapter;
+import io.vlingo.examples.ecommerce.infra.order.ShippedEventAdapter;
 import io.vlingo.examples.ecommerce.model.*;
 import io.vlingo.http.resource.Configuration;
 import io.vlingo.http.resource.Resources;
@@ -36,6 +38,10 @@ public class Bootstrap {
 
         registry.info(OrderEntity.class)
                 .registerEntryAdapter(OrderEvents.Created.class, new OrderCreatedEventAdapter(),
+                        journal::registerEntryAdapter)
+                .registerEntryAdapter(OrderEvents.PaymentReceived.class, new PaymentReceivedEventAdapter(),
+                        journal::registerEntryAdapter)
+                .registerEntryAdapter(OrderEvents.OrderShipped.class, new ShippedEventAdapter(),
                         journal::registerEntryAdapter);
 
         registry.info(CartEntity.class)

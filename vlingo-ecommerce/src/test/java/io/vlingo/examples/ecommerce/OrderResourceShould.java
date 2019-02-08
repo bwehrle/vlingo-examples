@@ -140,14 +140,13 @@ public class OrderResourceShould {
         return orderUrl.split("/")[2];
     }
 
-    //@Test --Not implemented in the actor yet, causes a failure
-    //
+    @Test
     public void orderIsPaid_whenPaymentReceived() throws IOException {
         String orderUrl = createOrder();
         String orderId  = getOrderId(orderUrl);
 
         final String expected = String.format(
-                "{\"orderId\":\"%s\",\"orderItems\":[]," +
+                "{\"orderId\":\"%s\",\"orderItems\":[{\"productId\":{\"id\":\"pid1\"},\"quantity\":100}]," +
                         "\"orderState\":\"paid\"}", orderId);
 
 

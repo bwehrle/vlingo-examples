@@ -9,7 +9,7 @@ public interface Order {
 
     void initOrderForUserProducts(UserId userId, Map<ProductId, Integer> quantityByProduct);
 
-    void paymentComplete(PaymentId paymentId, int orderStateHash);
+    void paymentComplete(PaymentId paymentId);
 
     void orderShipped(PaymentId paymentId, int orderStateHash);
 

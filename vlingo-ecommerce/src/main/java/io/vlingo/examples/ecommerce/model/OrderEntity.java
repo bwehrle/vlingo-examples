@@ -34,7 +34,7 @@ public class OrderEntity extends EventSourced implements Order {
     }
 
     private void applyShipment(OrderEvents.OrderShipped orderShipped) {
-        this.state = state.orderStatusUpdate(OrderStatusEnum.paid);
+        this.state = state.orderStatusUpdate(OrderStatusEnum.shipped);
     }
 
     private void applyPaymentReceived(OrderEvents.PaymentReceived paymentReceived) {
@@ -52,7 +52,7 @@ public class OrderEntity extends EventSourced implements Order {
     }
 
     @Override
-    public void paymentComplete(PaymentId paymentId, int orderStateHash) {
+    public void paymentComplete(PaymentId paymentId) {
         if (state.status != OrderStatusEnum.notPaid) {
             throw new IllegalStateException("Payment unexpected, already paid for.");
         }
