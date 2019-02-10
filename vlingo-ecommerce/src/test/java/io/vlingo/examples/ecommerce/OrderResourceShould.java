@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -38,6 +38,7 @@ public class OrderResourceShould {
     private static final AtomicInteger portNumber = new AtomicInteger(8081);
 
     private int orderPortNumber = portNumber.getAndIncrement();
+    private final Object lock = new Object();
 
     @Before
     public void setUp() throws InterruptedException {
@@ -55,7 +56,6 @@ public class OrderResourceShould {
         //Bootstrap.instance().server.shutDown().await(1);
         Bootstrap.instance().stop();
     }
-
 
     RequestSpecification baseGiven() {
         return given().port(orderPortNumber).accept(ContentType.JSON);
@@ -100,77 +100,34 @@ public class OrderResourceShould {
                 .body(is(equalTo(expected)));
     }
 
-    private Boolean createdOrderContainsProducts() {
-        String orderUrl = createOrder();
-        String orderId = getOrderId(orderUrl);
-
-        final String expected = String.format(
-                "{\"orderId\":\"%s\",\"orderItems\":[{\"productId\":{\"id\":\"pid1\"},\"quantity\":100}]," +
-                        "\"orderState\":\"notPaid\"}", orderId);
-
-        String body  =
-        baseGiven()
-                .when()
-                .get(orderUrl)
-                .then()
-                .assertThat()
-                .extract()
-                .body().asString();
-        return body.equals(expected);
-    }
-
     @Test
     public void createdOrderContainsProduct_inParallel() throws InterruptedException {
-        final TestUntil until = TestUntil.happenings(10);
-
-        List<Callable<Boolean>> callables       = new ArrayList<>();
-        ExecutorService      executorService = Executors.newFixedThreadPool(4);
+        final TestUntil until = TestUntil.happenings(TASK_COUNT);
+        final AtomicLong passCount = new AtomicLong();
+        final List<Callable<Void>> callableTests = new ArrayList<>();
+        ExecutorService executorService = Executors.newFixedThreadPool(4);
         for (int i = 0; i < TASK_COUNT; i++) {
-            callables.add(this::createdOrderContainsProducts);
+            callableTests.add(() -> {
+                boolean pass = false;
+                try {
+                    orderContainsProducts_whenQueried();
+                    pass = true;
+                } catch (Exception ignored) {}
+                finally {
+                    synchronized (lock) {
+                        passCount.addAndGet((pass?1:0));
+                        until.happened();
+                    }
+                }
+                return null;
+            });
         }
-        List<Future<Boolean>> fList = executorService.invokeAll(callables);
-        do {
-            long count = fList.stream().filter(Future::isDone).count();
-            if (count == TASK_COUNT) {
-                break;
-            }
-            Thread.sleep(100);
-            System.out.println("Waiting for N tasks: " + (TASK_COUNT - count));
-        } while (true);
-
-        fList.stream().forEach((taskAcknowleable) -> readOrHandleWithFalse(taskAcknowleable, until));
-
+        executorService.invokeAll(callableTests);
         until.completes();
 
         synchronized (lock) {
-          Assert.assertEquals(TASK_COUNT, totalTaskCount);
+            Assert.assertEquals(TASK_COUNT, passCount.get());
         }
-    }
-
-    private final Object lock = new Object();
-    private int totalTaskCount = 0;
-
-    private void readOrHandleWithFalse(Future<Boolean> f, final TestUntil until) {
-        try {
-          synchronized (lock) {
-            if (f.get()) {
-              System.out.println("READ TRUE");
-            } else {
-              System.out.println("READ FALSE");
-            }
-
-            // this is accurate because some may have
-            // already executed and stopped
-
-            ++totalTaskCount;
-          }
-        } catch (Exception e) {
-          System.out.println("READ FAILED");
-        }
-
-        until.happened();
-
-        return;
     }
 
     private String getOrderId(String orderUrl) {

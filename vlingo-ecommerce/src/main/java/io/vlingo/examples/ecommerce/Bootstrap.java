@@ -23,14 +23,12 @@ import io.vlingo.symbio.store.journal.inmemory.InMemoryJournalActor;
 
 public class Bootstrap {
     private static Bootstrap instance;
-    public final Server server;
-    public final World world;
-    public final int portNumber;
+    private final Server server;
+    private final World world;
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Bootstrap(final int portNumber) {
         world = World.startWithDefaults("cartservice");
-        this.portNumber = portNumber;
 
         MockJournalListener listener = new MockJournalListener();
         Journal<String> journal = Journal.using(world.stage(), InMemoryJournalActor.class, listener);
@@ -91,7 +89,7 @@ public class Bootstrap {
       return instance(8081);
     }
 
-    public static void main(final String[] args) throws Exception {
+    public static void main(final String[] args) {
         System.out.println("=======================");
         System.out.println("service: ecommerce-started.");
         System.out.println("=======================");
@@ -102,7 +100,7 @@ public class Bootstrap {
         return server.startUp();
     }
 
-    public void stop() throws InterruptedException {
+    void stop() {
         //todo: this call fails after timeout / does not throw exception
         //instance.server.shutDown().await(10000);
         Bootstrap.instance().server.stop();
