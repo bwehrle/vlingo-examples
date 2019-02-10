@@ -6,11 +6,12 @@ import io.restassured.parsing.Parser;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import org.apache.http.HttpStatus;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -21,16 +22,22 @@ import static org.hamcrest.text.MatchesPattern.matchesPattern;
 
 public class CartResourceShould {
 
-    @BeforeClass
-    public static void setUp() throws InterruptedException {
+    private static final AtomicInteger portNumber = new AtomicInteger(9091);
+
+    private int cartPortNumber = portNumber.getAndIncrement();
+
+    @Before
+    public void setUp() throws InterruptedException {
+        Bootstrap.instance(cartPortNumber);
+
         //todo:missing response Content-Type
         RestAssured.defaultParser = Parser.JSON;
         Boolean startUpSuccess = Bootstrap.instance().serverStartup().await(100);
         assertThat(startUpSuccess, is(equalTo(true)));
     }
 
-    @AfterClass
-    public static void cleanUp() throws InterruptedException {
+    @After
+    public void cleanUp() throws InterruptedException {
         //todo: this call fails after timeout / does not throw exception
         //Bootstrap.instance().server.shutDown().await(1);
         Bootstrap.instance().stop();
@@ -38,7 +45,7 @@ public class CartResourceShould {
 
 
     RequestSpecification baseGiven() {
-        return given().port(8081).accept(ContentType.JSON);
+        return given().port(cartPortNumber).accept(ContentType.JSON);
     }
 
     String createCart() {

@@ -6,11 +6,15 @@ import io.restassured.mapper.ObjectMapperType;
 import io.restassured.parsing.Parser;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
+import io.vlingo.actors.testkit.TestUntil;
 import io.vlingo.examples.ecommerce.model.OrderResource;
 import io.vlingo.examples.ecommerce.model.ProductId;
 import io.vlingo.examples.ecommerce.model.UserId;
 import org.apache.http.HttpStatus;
-import org.junit.*;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -19,6 +23,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -28,37 +33,32 @@ import static org.hamcrest.text.MatchesPattern.matchesPattern;
 
 public class OrderResourceShould {
 
-
     public static final int TASK_COUNT = 10;
 
-    @BeforeClass
-    public static void setUp() throws InterruptedException {
+    private static final AtomicInteger portNumber = new AtomicInteger(8081);
+
+    private int orderPortNumber = portNumber.getAndIncrement();
+
+    @Before
+    public void setUp() throws InterruptedException {
+        Bootstrap.instance(orderPortNumber);
+
         //todo:missing response Content-Type
         RestAssured.defaultParser = Parser.JSON;
         Boolean startUpSuccess = Bootstrap.instance().serverStartup().await(100);
         assertThat(startUpSuccess, is(equalTo(true)));
     }
 
-    @AfterClass
-    public static void cleanUp() throws InterruptedException {
+    @After
+    public void cleanUp() throws InterruptedException {
         //todo: this call fails after timeout / does not throw exception
         //Bootstrap.instance().server.shutDown().await(1);
         Bootstrap.instance().stop();
     }
 
-    private static Boolean getOrHandleWithFalse(Future<Boolean> f) {
-        try {
-            synchronized (f) {
-                return f.get();
-            }
-        } catch (Exception e) {
-            System.out.println("Caught exception: " + e.getMessage());
-        }
-        return false;
-    }
 
     RequestSpecification baseGiven() {
-        return given().port(8081).accept(ContentType.JSON);
+        return given().port(orderPortNumber).accept(ContentType.JSON);
     }
 
     String createOrder() {
@@ -108,22 +108,23 @@ public class OrderResourceShould {
                 "{\"orderId\":\"%s\",\"orderItems\":[{\"productId\":{\"id\":\"pid1\"},\"quantity\":100}]," +
                         "\"orderState\":\"notPaid\"}", orderId);
 
-        String body =
-                baseGiven()
-                        .when()
-                        .get(orderUrl)
-                        .then()
-                        .assertThat()
-                        .extract()
-                        .body().asString();
-        System.out.println(body.toString());
+        String body  =
+        baseGiven()
+                .when()
+                .get(orderUrl)
+                .then()
+                .assertThat()
+                .extract()
+                .body().asString();
         return body.equals(expected);
     }
 
     @Test
     public void createdOrderContainsProduct_inParallel() throws InterruptedException {
-        List<Callable<Boolean>> callables = new ArrayList<>();
-        ExecutorService executorService = Executors.newFixedThreadPool(4);
+        final TestUntil until = TestUntil.happenings(10);
+
+        List<Callable<Boolean>> callables       = new ArrayList<>();
+        ExecutorService      executorService = Executors.newFixedThreadPool(4);
         for (int i = 0; i < TASK_COUNT; i++) {
             callables.add(this::createdOrderContainsProducts);
         }
@@ -133,9 +134,43 @@ public class OrderResourceShould {
             if (count == TASK_COUNT) {
                 break;
             }
+            Thread.sleep(100);
             System.out.println("Waiting for N tasks: " + (TASK_COUNT - count));
         } while (true);
-        Assert.assertEquals(TASK_COUNT, fList.stream().filter(OrderResourceShould::getOrHandleWithFalse).count());
+
+        fList.stream().forEach((taskAcknowleable) -> readOrHandleWithFalse(taskAcknowleable, until));
+
+        until.completes();
+
+        synchronized (lock) {
+          Assert.assertEquals(TASK_COUNT, totalTaskCount);
+        }
+    }
+
+    private final Object lock = new Object();
+    private int totalTaskCount = 0;
+
+    private void readOrHandleWithFalse(Future<Boolean> f, final TestUntil until) {
+        try {
+          synchronized (lock) {
+            if (f.get()) {
+              System.out.println("READ TRUE");
+            } else {
+              System.out.println("READ FALSE");
+            }
+
+            // this is accurate because some may have
+            // already executed and stopped
+
+            ++totalTaskCount;
+          }
+        } catch (Exception e) {
+          System.out.println("READ FAILED");
+        }
+
+        until.happened();
+
+        return;
     }
 
     private String getOrderId(String orderUrl) {

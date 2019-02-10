@@ -13,9 +13,13 @@ public class PaymentReceivedEventAdapter implements EntryAdapter<OrderEvents.Pay
         return JsonSerialization.deserialized(entry.entryData, OrderEvents.PaymentReceived.class);
     }
 
-    @Override
     public Entry.TextEntry toEntry(final OrderEvents.PaymentReceived source) {
+        return toEntry(source, source.orderId);
+    }
+
+    @Override
+    public Entry.TextEntry toEntry(OrderEvents.PaymentReceived source, String id) {
         final String serialization = JsonSerialization.serialized(source);
-        return new Entry.TextEntry(OrderEvents.PaymentReceived.class, 1, serialization, Metadata.nullMetadata());
+        return new Entry.TextEntry(id, OrderEvents.PaymentReceived.class, 1, serialization, Metadata.nullMetadata());
     }
 }

@@ -10,9 +10,7 @@ import java.util.List;
 
 import static io.vlingo.common.serialization.JsonSerialization.serialized;
 import static io.vlingo.http.Response.Status.*;
-import static io.vlingo.http.ResponseHeader.Location;
-import static io.vlingo.http.ResponseHeader.headers;
-import static io.vlingo.http.ResponseHeader.of;
+import static io.vlingo.http.ResponseHeader.*;
 import static io.vlingo.http.resource.ResourceBuilder.*;
 
 public class CartResource {
@@ -58,7 +56,7 @@ public class CartResource {
         return ROOT_URL + "/" + shoppingCartId;
     }
 
-    public Resource routes() {
+    public Resource<?> routes() {
 
         return resource("Cart resource fluent api",
                 post("/cart")
