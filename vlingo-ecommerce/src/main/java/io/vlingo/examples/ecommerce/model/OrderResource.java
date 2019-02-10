@@ -14,9 +14,9 @@ import static io.vlingo.http.ResponseHeader.*;
 import static io.vlingo.http.resource.ResourceBuilder.*;
 
 public class OrderResource {
-    private static final String         ROOT_URL = "/order";
-    private final        AddressFactory addressFactory;
-    private final        Stage          stage;
+    private static final String ROOT_URL = "/order";
+    private final AddressFactory addressFactory;
+    private final Stage stage;
 
     public OrderResource(final World world) {
         this.addressFactory = world.addressFactory();
@@ -24,11 +24,10 @@ public class OrderResource {
     }
 
     private Completes<Response> create(final OrderCreateRequest request) {
-        final Address           orderAddress        = addressFactory.uniquePrefixedWith("order-");
+        final Address orderAddress = addressFactory.uniquePrefixedWith("order-");
         Map<ProductId, Integer> quantityByProductId = new HashMap<>();
         request.quantityByIdOfProduct.forEach((key, value) -> quantityByProductId.put(new ProductId(key), value));
 
-        System.out.println("OrderId from address: " + orderAddress.idString());
 
         Order orderActor = stage.actorFor(
                 Order.class,
@@ -45,7 +44,10 @@ public class OrderResource {
 
     private Completes<Response> postPayment(String orderId, PaymentId paymentId) {
         return stage.actorOf(Order.class, addressFactory.from(orderId))
-                    .andThen(actor -> {actor.paymentComplete(paymentId); return actor;})
+                    .andThen(actor -> {
+                        actor.paymentComplete(paymentId);
+                        return actor;
+                    })
                     .andThenTo(actor -> Completes.withSuccess(Response.of(Ok, "")))
                     .otherwise(noOrder -> Response.of(NotFound, urlLocation(orderId)));
     }
@@ -78,7 +80,7 @@ public class OrderResource {
 
     public static class OrderCreateRequest {
         final Map<String, Integer> quantityByIdOfProduct;
-        final UserId               userId;
+        final UserId userId;
 
         OrderCreateRequest(Map<String, Integer> quantityByIdOfProduct, UserId userId) {
             this.quantityByIdOfProduct = quantityByIdOfProduct;
@@ -87,7 +89,7 @@ public class OrderResource {
 
         public static class Builder {
             private Map<String, Integer> quantityByIdOfProduct;
-            private UserId               userId;
+            private UserId userId;
 
             private Builder() {
                 quantityByIdOfProduct = new HashMap<>();

@@ -46,6 +46,16 @@ public class OrderResourceShould {
         Bootstrap.instance().stop();
     }
 
+    private static Boolean getOrHandleWithFalse(Future<Boolean> f) {
+        try {
+            synchronized (f) {
+                return f.get();
+            }
+        } catch (Exception e) {
+            System.out.println("Caught exception: " + e.getMessage());
+        }
+        return false;
+    }
 
     RequestSpecification baseGiven() {
         return given().port(8081).accept(ContentType.JSON);
@@ -76,7 +86,7 @@ public class OrderResourceShould {
     @Test
     public void orderContainsProducts_whenQueried() {
         String orderUrl = createOrder();
-        String orderId  = getOrderId(orderUrl);
+        String orderId = getOrderId(orderUrl);
 
         final String expected = String.format(
                 "{\"orderId\":\"%s\",\"orderItems\":[{\"productId\":{\"id\":\"pid1\"},\"quantity\":100}]," +
@@ -90,29 +100,30 @@ public class OrderResourceShould {
                 .body(is(equalTo(expected)));
     }
 
-    private Boolean createdOrderContainsProducts()  {
+    private Boolean createdOrderContainsProducts() {
         String orderUrl = createOrder();
-        String orderId  = getOrderId(orderUrl);
+        String orderId = getOrderId(orderUrl);
 
         final String expected = String.format(
                 "{\"orderId\":\"%s\",\"orderItems\":[{\"productId\":{\"id\":\"pid1\"},\"quantity\":100}]," +
                         "\"orderState\":\"notPaid\"}", orderId);
 
-        String body  =
-        baseGiven()
-                .when()
-                .get(orderUrl)
-                .then()
-                .assertThat()
-                .extract()
-                .body().asString();
+        String body =
+                baseGiven()
+                        .when()
+                        .get(orderUrl)
+                        .then()
+                        .assertThat()
+                        .extract()
+                        .body().asString();
+        System.out.println(body.toString());
         return body.equals(expected);
     }
 
     @Test
     public void createdOrderContainsProduct_inParallel() throws InterruptedException {
-        List<Callable<Boolean>> callables       = new ArrayList<>();
-        ExecutorService      executorService = Executors.newFixedThreadPool(4);
+        List<Callable<Boolean>> callables = new ArrayList<>();
+        ExecutorService executorService = Executors.newFixedThreadPool(4);
         for (int i = 0; i < TASK_COUNT; i++) {
             callables.add(this::createdOrderContainsProducts);
         }
@@ -122,18 +133,9 @@ public class OrderResourceShould {
             if (count == TASK_COUNT) {
                 break;
             }
-            Thread.sleep(100);
             System.out.println("Waiting for N tasks: " + (TASK_COUNT - count));
         } while (true);
         Assert.assertEquals(TASK_COUNT, fList.stream().filter(OrderResourceShould::getOrHandleWithFalse).count());
-    }
-
-    private static Boolean getOrHandleWithFalse(Future<Boolean> f) {
-        try {
-            return  f.get();
-        } catch (Exception e) {
-        }
-        return false;
     }
 
     private String getOrderId(String orderUrl) {
@@ -143,7 +145,7 @@ public class OrderResourceShould {
     @Test
     public void orderIsPaid_whenPaymentReceived() throws IOException {
         String orderUrl = createOrder();
-        String orderId  = getOrderId(orderUrl);
+        String orderId = getOrderId(orderUrl);
 
         final String expected = String.format(
                 "{\"orderId\":\"%s\",\"orderItems\":[{\"productId\":{\"id\":\"pid1\"},\"quantity\":100}]," +
