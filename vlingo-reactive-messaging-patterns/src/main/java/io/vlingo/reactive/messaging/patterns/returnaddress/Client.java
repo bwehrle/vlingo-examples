@@ -8,13 +8,12 @@
 package io.vlingo.reactive.messaging.patterns.returnaddress;
 
 import io.vlingo.actors.Actor;
-import io.vlingo.actors.testkit.TestUntil;
 
 public class Client extends Actor implements Consumer {
-  private final TestUntil until;
+  private final ReturnAddressResults results;
 
-  public Client(final Service service, final TestUntil until) {
-    this.until = until;
+  public Client(final Service service, final ReturnAddressResults results) {
+    this.results = results;
 
     service.simpleRequestFor("Simple Request from Client-Consumer!", selfAs(Consumer.class));
     service.complexRequestFor("Complex Request from Client-Consumer!", selfAs(Consumer.class));
@@ -22,13 +21,13 @@ public class Client extends Actor implements Consumer {
 
   @Override
   public void replyToSimple(final String what) {
-    logger().log("Consumer received reply-to-simple: " + what);
-    until.happened();
+    logger().debug("Consumer received reply-to-simple: " + what);
+    results.access.writeUsing("afterSimpleReplyCount", 1);
   }
 
   @Override
   public void replyToComplex(final String what) {
-    logger().log("Consumer received reply-to-complex: " + what);
-    until.happened();
+    logger().debug("Consumer received reply-to-complex: " + what);
+    results.access.writeUsing("afterComplexReplyCount", 1);
   }
 }

@@ -1,9 +1,7 @@
 package io.vlingo.reactive.messaging.patterns.contentbasedrouter.actor;
 
 import io.vlingo.actors.Actor;
-import io.vlingo.actors.Definition;
 import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
 import io.vlingo.reactive.messaging.patterns.contentbasedrouter.order.OrderPlaced;
 
 /**
@@ -17,13 +15,13 @@ public class OrderRouterActor extends Actor implements OrderRouter {
 
     private Inventory inventorySystemA;
     private Inventory inventorySystemX;
-    private TestUntil testUntil;
+    private OrderRoutingResults orderRoutingResults;
 
-    public OrderRouterActor(final TestUntil testUntil) {
+    public OrderRouterActor(final OrderRoutingResults orderRoutingResults) {
         World world = stage ().world ();
-        this.testUntil = testUntil;
-        inventorySystemA = world.actorFor ( Definition.has ( InventorySystemA.class, Definition.NoParameters ), Inventory.class );
-        inventorySystemX = world.actorFor ( Definition.has ( InventorySystemX.class, Definition.NoParameters ), Inventory.class );
+        this.orderRoutingResults = orderRoutingResults;
+        inventorySystemA = world.actorFor ( Inventory.class, InventorySystemA.class );
+        inventorySystemX = world.actorFor ( Inventory.class, InventorySystemX.class );
     }
 
     /**
@@ -39,14 +37,14 @@ public class OrderRouterActor extends Actor implements OrderRouter {
         } else if (orderPlaced.getOrder ().getType ().contains ( TYPE_XYZ )) {
             inventorySystemX.handleOrder ( orderPlaced.getOrder () );
         } else {
-            logger ().log ( "OrderRouter: received unexpected message" );
+            logger ().error ( "OrderRouter: received unexpected message" );
         }
-        this.testUntil.happened ();
+        this.orderRoutingResults.access.writeUsing("afterOrderRoutedCount", 1);
     }
 
     @Override
     protected void afterStop() {
-        this.testUntil.happened ();
+        this.orderRoutingResults.access.writeUsing("afterStoppedCount", 1);
         super.afterStop ();
     }
 }

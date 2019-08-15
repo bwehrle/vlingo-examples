@@ -7,8 +7,6 @@
 
 package com.saasovation.collaboration.model.forum;
 
-import java.util.function.BiConsumer;
-
 import com.saasovation.collaboration.model.Author;
 import com.saasovation.collaboration.model.Tenant;
 import com.saasovation.collaboration.model.forum.Events.DiscussionClosed;
@@ -24,12 +22,7 @@ public class DiscussionEntity extends EventSourced implements Discussion {
   private State state;
 
   public DiscussionEntity(final Tenant tenant, final ForumId forumId, final DiscussionId discussionId) {
-    super(tenant.value, discussionId.value);
-
-    if (state == null) {
-      // state was not recovered from event stream
-      state = new State(tenant, forumId, discussionId);
-    }
+    state = new State(tenant, forumId, discussionId);
   }
 
   @Override
@@ -68,55 +61,16 @@ public class DiscussionEntity extends EventSourced implements Discussion {
     }
   }
 
-  private final class State {
-    public final Tenant tenant;
-    public final ForumId forumId;
-    public final DiscussionId discussionId;
-    public final Author author;
-    public final String topic;
-    public final boolean open;
-
-    State(final Tenant tenant, final ForumId forumId, final DiscussionId discussionId) {
-      this(tenant, forumId, discussionId, null, null, false);
-    }
-
-    State(
-            final Tenant tenant,
-            final ForumId forumId,
-            final DiscussionId discussionId,
-            final Author author,
-            final String topic,
-            final boolean open) {
-      this.tenant = tenant;
-      this.forumId = forumId;
-      this.discussionId = discussionId;
-      this.author = author;
-      this.topic = topic;
-      this.open = open;
-    }
-
-    State closed() {
-      return new State(tenant, forumId, discussionId, author, topic, false);
-    }
-
-    State opened() {
-      return new State(tenant, forumId, discussionId, author, topic, true);
-    }
-
-    State withTopic(final String topic) {
-      return new State(tenant, forumId, discussionId, author, topic, open);
-    }
+  @Override
+  protected String streamName() {
+    return streamNameFrom(":", state.tenant.value, state.discussionId.value);
   }
 
   static {
-    BiConsumer<DiscussionEntity, DiscussionStarted> applyDiscussionStartedFn = DiscussionEntity::applyDiscussionStarted;
-    EventSourced.registerConsumer(DiscussionEntity.class, DiscussionStarted.class, applyDiscussionStartedFn);
-    BiConsumer<DiscussionEntity, DiscussionClosed> applyDiscussionClosedFn = DiscussionEntity::applyDiscussionClosed;
-    EventSourced.registerConsumer(DiscussionEntity.class, DiscussionClosed.class, applyDiscussionClosedFn);
-    BiConsumer<DiscussionEntity, DiscussionReopened> applyDiscussionReopenedFn = DiscussionEntity::applyDiscussionReopened;
-    EventSourced.registerConsumer(DiscussionEntity.class, DiscussionReopened.class, applyDiscussionReopenedFn);
-    BiConsumer<DiscussionEntity, DiscussionTopicChanged> applyDiscussionTopicChangedFn = DiscussionEntity::applyDiscussionTopicChanged;
-    EventSourced.registerConsumer(DiscussionEntity.class, DiscussionTopicChanged.class, applyDiscussionTopicChangedFn);
+    EventSourced.registerConsumer(DiscussionEntity.class, DiscussionStarted.class, DiscussionEntity::applyDiscussionStarted);
+    EventSourced.registerConsumer(DiscussionEntity.class, DiscussionClosed.class, DiscussionEntity::applyDiscussionClosed);
+    EventSourced.registerConsumer(DiscussionEntity.class, DiscussionReopened.class, DiscussionEntity::applyDiscussionReopened);
+    EventSourced.registerConsumer(DiscussionEntity.class, DiscussionTopicChanged.class, DiscussionEntity::applyDiscussionTopicChanged);
   }
 
   private void applyDiscussionStarted(final DiscussionStarted e) {

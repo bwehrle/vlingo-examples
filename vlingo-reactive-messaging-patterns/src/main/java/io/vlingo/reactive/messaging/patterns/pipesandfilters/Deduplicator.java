@@ -7,35 +7,34 @@
 
 package io.vlingo.reactive.messaging.patterns.pipesandfilters;
 
+import io.vlingo.actors.Actor;
+
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 
-import io.vlingo.actors.Actor;
-import io.vlingo.actors.testkit.TestUntil;
-
 public class Deduplicator extends Actor implements OrderProcessor {
   private final OrderProcessor nextFilter;
   private final Set<String> processedOrderIds;
-  private final TestUntil until;
+  private final PipeAndFilterResults results;
 
-  public Deduplicator(final OrderProcessor nextFilter, final TestUntil until) {
+  public Deduplicator(final OrderProcessor nextFilter, final PipeAndFilterResults results) {
     this.nextFilter = nextFilter;
-    this.until = until;
+    this.results = results;
     this.processedOrderIds = new HashSet<>();
   }
 
   @Override
   public void processIncomingOrder(final byte[] orderInfo) {
     final String textOrderInfo = new String(orderInfo, StandardCharsets.UTF_8);
-    logger().log("Deduplicator: processing: " + textOrderInfo);
+    logger().debug("Deduplicator: processing: " + textOrderInfo);
     final String orderId = orderIdFrom(textOrderInfo);
     if (processedOrderIds.add(orderId)) {
       nextFilter.processIncomingOrder(orderInfo);
     } else {
-      logger().log("Deduplicator: found duplicate order " + orderId);
+      logger().debug("Deduplicator: found duplicate order " + orderId);
     }
-    until.happened();
+    results.access.writeUsing("afterOrderDeduplicatedCount", 1);
   }
 
   private String orderIdFrom(final String textOrderInfo) {

@@ -8,7 +8,6 @@ package io.vlingo.reactive.messaging.patterns.messageexpiration;
 
 import io.vlingo.actors.Actor;
 import io.vlingo.actors.DeadLetter;
-import io.vlingo.actors.testkit.TestUntil;
 
 /**
  * PurchaseAgent {@link Actor} responsible for placing an order for messages that have not yet expired.
@@ -17,11 +16,11 @@ public class PurchaseAgent
 extends Actor 
 implements OrderProcessor
 {
-    public final TestUntil until;
+    public final MessageExpirationResults results;
     
-    public PurchaseAgent( TestUntil until )
+    public PurchaseAgent( final MessageExpirationResults results )
     {
-        this.until = until;
+        this.results = results;
     }
     
     /* @see io.vlingo.reactive.messaging.patterns.messageexpiration.OrderProcessor#placeOrder(io.vlingo.reactive.messaging.patterns.messageexpiration.Order) */
@@ -31,12 +30,14 @@ implements OrderProcessor
         if ( order.isExpired() )
         {
             this.deadLetters().failedDelivery( new DeadLetter( this, "stop()" ));
-            logger().log( String.format( "PurchaseAgent: delivered expired %s to dead letters", order ));
+            results.access.writeUsing("afterOrderExpiredCount", 1);
+            logger().debug( String.format( "PurchaseAgent: delivered expired %s to dead letters", order ));
         }
         else
         {
-            logger().log( String.format( "PurchaseAgent: placing order for %s", order ));
+            results.access.writeUsing("afterOrderPlacedCount", 1);
+            logger().debug( String.format( "PurchaseAgent: placing order for %s", order ));
         }
-        until.happened();
+
     }
 }

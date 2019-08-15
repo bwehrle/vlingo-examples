@@ -9,11 +9,12 @@ import io.vlingo.eventjournal.counter.CounterActor;
 import io.vlingo.eventjournal.counter.CounterQuery;
 import io.vlingo.eventjournal.counter.CounterQueryActor;
 import io.vlingo.eventjournal.interest.NoopConfigurationInterest;
-import io.vlingo.eventjournal.interest.NoopEventJournalListener;
+import io.vlingo.eventjournal.interest.NoopEventJournalDispatcher;
+import io.vlingo.symbio.store.DataFormat;
+import io.vlingo.symbio.store.common.jdbc.Configuration;
+import io.vlingo.symbio.store.common.jdbc.DatabaseType;
 import io.vlingo.symbio.store.journal.Journal;
 import io.vlingo.symbio.store.journal.jdbc.postgres.PostgresJournalActor;
-import io.vlingo.symbio.store.state.StateStore;
-import io.vlingo.symbio.store.state.jdbc.Configuration;
 
 public class Bootstrap {
     private static final String DB_URL = "jdbc:postgresql://[::1]:5432/";
@@ -24,9 +25,10 @@ public class Bootstrap {
     public static void main(String[] args) throws Exception {
         Flyway.configure().dataSource(DB_URL, DB_USER, DB_PWD).load().migrate();
         final Configuration configuration = new Configuration(
+        		DatabaseType.Postgres,
                 new NoopConfigurationInterest(),
                 "org.postgresql.Driver",
-                StateStore.DataFormat.Text,
+                DataFormat.Text,
                 DB_URL,
                 DB_NAME,
                 DB_USER,
@@ -37,20 +39,18 @@ public class Bootstrap {
         );
 
         final World world = World.startWithDefaults("event-journal");
-        @SuppressWarnings("unchecked")
-        Journal<String> journal = world.actorFor(
-                Definition.has(PostgresJournalActor.class, Definition.parameters(configuration, new NoopEventJournalListener())),
-                Journal.class
-        );
+
+        final NoopEventJournalDispatcher journalDispatcher = new NoopEventJournalDispatcher();
+        Journal<String> journal = Journal.using(world.stage(), PostgresJournalActor.class, journalDispatcher, configuration);
 
         final Counter counter = world.actorFor(
-                Definition.has(CounterActor.class, Definition.parameters(DB_NAME, journal)),
-                Counter.class
+                Counter.class,
+                Definition.has(CounterActor.class, Definition.parameters(DB_NAME, journal))
         );
 
         final CounterQuery counterQuery = world.actorFor(
-                Definition.has(CounterQueryActor.class, Definition.parameters(journal.journalReader(DB_NAME).await())),
-                CounterQuery.class
+                CounterQuery.class,
+                Definition.has(CounterQueryActor.class, Definition.parameters(journal.journalReader(DB_NAME).await()))
         );
 
         for (int i = 0; i < 5000; i++) {

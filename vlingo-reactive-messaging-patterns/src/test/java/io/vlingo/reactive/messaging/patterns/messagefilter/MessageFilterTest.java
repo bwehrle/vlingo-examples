@@ -7,15 +7,16 @@
 
 package io.vlingo.reactive.messaging.patterns.messagefilter;
 
-import io.vlingo.actors.Definition;
-import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
-import org.junit.Test;
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
 
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
+import org.junit.Assert;
+import org.junit.Test;
+
+import io.vlingo.actors.World;
+import io.vlingo.actors.testkit.AccessSafely;
 
 public class MessageFilterTest {
 
@@ -26,26 +27,18 @@ public class MessageFilterTest {
 
         final World world = World.startWithDefaults("message-filter-test");
 
-        final TestUntil until = TestUntil.happenings(3);
+        final MessageFilterResults results = new MessageFilterResults();
+
+        final AccessSafely access = results.afterCompleting(3);
 
         final InventorySystem restrictedInventorySystemActor =
-                world.actorFor(
-                        Definition.has(
-                                RestrictedInventorySystemActor.class,
-                                Definition.parameters(until)),
-                        InventorySystem.class);
+                world.actorFor(InventorySystem.class, RestrictedInventorySystemActor.class, results);
 
         final InventorySystem notRestrictedInventorySystemActor =
-                world.actorFor(
-                        Definition.has(NotRestrictedInventorySystemActor.class,
-                                Definition.parameters(until)),
-                        InventorySystem.class);
+                world.actorFor(InventorySystem.class, NotRestrictedInventorySystemActor.class, results);
 
         final InventorySystem inventoryMessageFilter =
-                world.actorFor(
-                        Definition.has(InventorySystemMessageFilter.class,
-                                Definition.parameters(until, notRestrictedInventorySystemActor)),
-                        InventorySystem.class);
+                world.actorFor(InventorySystem.class, InventorySystemMessageFilter.class, results, notRestrictedInventorySystemActor);
 
         final Order order =
                 new Order("1",
@@ -59,7 +52,8 @@ public class MessageFilterTest {
         notRestrictedInventorySystemActor.processOrder(order);
         inventoryMessageFilter.processOrder(order);
 
-        until.completes();
+        Assert.assertEquals(1, (int) access.readFrom("afterOrderProcessedCount"));
+        Assert.assertEquals(2, (int) access.readFrom("afterOrderFilteredCount"));
 
         System.out.println("Message Filter: is completed.");
     }

@@ -7,8 +7,6 @@
 
 package com.saasovation.collaboration.model.forum;
 
-import java.util.function.BiConsumer;
-
 import com.saasovation.collaboration.model.Author;
 import com.saasovation.collaboration.model.Moderator;
 import com.saasovation.collaboration.model.Tenant;
@@ -21,12 +19,7 @@ public class PostEntity extends EventSourced implements Post {
   private State state;
 
   public PostEntity(final Tenant tenant, final ForumId forumId, final DiscussionId discussionId, final PostId postId) {
-    super(tenant.value, postId.value);
-
-    if (state == null) {
-      // state was not recovered from event stream
-      state = new State(tenant, forumId, discussionId, postId);
-    }
+    state = new State(tenant, forumId, discussionId, postId);
   }
 
   @Override
@@ -46,49 +39,14 @@ public class PostEntity extends EventSourced implements Post {
     }
   }
 
-  private final class State {
-    public final Tenant tenant;
-    public final ForumId forumId;
-    public final DiscussionId discussionId;
-    public final PostId postId;
-    public final Author author;
-    public final Moderator moderator;
-    public final String subject;
-    public final String bodyText;
-
-    State(final Tenant tenant, final ForumId forumId, final DiscussionId discussionId, final PostId postId) {
-      this(tenant, forumId, discussionId, postId, null, null, null, null);
-    }
-
-    State(
-            final Tenant tenant,
-            final ForumId forumId,
-            final DiscussionId discussionId,
-            final PostId postId,
-            final Author author,
-            final Moderator moderator,
-            final String subject,
-            final String bodyText) {
-      this.tenant = tenant;
-      this.forumId = forumId;
-      this.discussionId = discussionId;
-      this.postId = postId;
-      this.author = author;
-      this.subject = subject;
-      this.bodyText = bodyText;
-      this.moderator = moderator;
-    }
-
-    State withModeratedContent(final Moderator moderator, final String subject, final String bodyText) {
-      return new State(tenant, forumId, discussionId, postId, author, moderator, subject, bodyText);
-    }
+  @Override
+  protected String streamName() {
+    return streamNameFrom(":", state.tenant.value, state.postId.value);
   }
 
   static {
-    BiConsumer<PostEntity, PostedToDiscussion> applyPostedToDiscussionFn = PostEntity::applyPostedToDiscussion;
-    EventSourced.registerConsumer(PostEntity.class, PostedToDiscussion.class, applyPostedToDiscussionFn);
-    BiConsumer<PostEntity, PostModerated> applyPostModeratedFn = PostEntity::applyPostModerated;
-    EventSourced.registerConsumer(PostEntity.class, PostModerated.class, applyPostModeratedFn);
+    EventSourced.registerConsumer(PostEntity.class, PostedToDiscussion.class, PostEntity::applyPostedToDiscussion);
+    EventSourced.registerConsumer(PostEntity.class, PostModerated.class, PostEntity::applyPostModerated);
   }
 
   private void applyPostedToDiscussion(final PostedToDiscussion e) {

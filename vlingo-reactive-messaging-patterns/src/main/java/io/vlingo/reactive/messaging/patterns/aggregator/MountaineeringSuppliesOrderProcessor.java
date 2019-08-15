@@ -7,16 +7,14 @@
 
 package io.vlingo.reactive.messaging.patterns.aggregator;
 
+import io.vlingo.actors.Actor;
+import io.vlingo.reactive.messaging.patterns.aggregator.PriceQuotes.PriceQuote;
+import io.vlingo.reactive.messaging.patterns.aggregator.PriceQuotes.PriceQuoteRequest;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import io.vlingo.actors.Actor;
-import io.vlingo.actors.Definition;
-import io.vlingo.actors.testkit.TestUntil;
-import io.vlingo.reactive.messaging.patterns.aggregator.PriceQuotes.PriceQuote;
-import io.vlingo.reactive.messaging.patterns.aggregator.PriceQuotes.PriceQuoteRequest;
 
 public class MountaineeringSuppliesOrderProcessor extends Actor
     implements RequestForQuotationProcessor, RequestForQuotationSupplier,
@@ -25,18 +23,17 @@ public class MountaineeringSuppliesOrderProcessor extends Actor
   private final PriceQuoteAggregator aggregator;
   private final Map<String,PriceQuoteInterest> interests;
   private final PriceQuoteRequester requester;
-  private final TestUntil until;
+  private final AggregatorResults results;
 
-  public MountaineeringSuppliesOrderProcessor(final TestUntil until) {
-    this.until = until;
+  public MountaineeringSuppliesOrderProcessor(final AggregatorResults results) {
+    this.results = results;
     this.interests = new HashMap<>();
     this.requester = selfAs(PriceQuoteRequester.class);
     this.aggregator =
             stage().actorFor(
-                    Definition.has(
-                            PriceQuoteAggregatorActor.class,
-                            Definition.parameters(selfAs(PriceQuotesFulfillmentWatcher.class))),
-                    PriceQuoteAggregator.class);
+                    PriceQuoteAggregator.class,
+                    PriceQuoteAggregatorActor.class,
+                    selfAs(PriceQuotesFulfillmentWatcher.class));
   }
 
   //========================================
@@ -74,7 +71,7 @@ public class MountaineeringSuppliesOrderProcessor extends Actor
 
   @Override
   public void quotationFulfillmentCompleted(final QuotationFulfillment fulfillment) {
-    until.happened();
+    results.access.writeUsing("afterQuotationFulfillmentCount", 1);
   }
 
   //========================================
@@ -95,7 +92,7 @@ public class MountaineeringSuppliesOrderProcessor extends Actor
   private void dispatchTo(final RequestForQuotation rfq, Iterable<PriceQuoteInterest> recipientList) {
     recipientList.forEach(recipient -> {
       rfq.retailItems.forEach(retailItem -> {
-        logger().log("OrderProcessor: " + rfq.rfqId + " item: " + retailItem.itemId + " to: " + recipient.id);
+        logger().debug("OrderProcessor: " + rfq.rfqId + " item: " + retailItem.itemId + " to: " + recipient.id);
         recipient.priceQuotes.requestPriceQuote(new PriceQuoteRequest(rfq.rfqId, retailItem.itemId, retailItem.retailPrice, rfq.totalRetailPrice), requester);
       });
     });

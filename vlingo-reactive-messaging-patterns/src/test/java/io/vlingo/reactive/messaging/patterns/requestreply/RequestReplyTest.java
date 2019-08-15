@@ -7,11 +7,11 @@
 
 package io.vlingo.reactive.messaging.patterns.requestreply;
 
+import org.junit.Assert;
 import org.junit.Test;
 
-import io.vlingo.actors.Definition;
 import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
+import io.vlingo.actors.testkit.AccessSafely;
 
 public class RequestReplyTest {
   @Test
@@ -20,12 +20,14 @@ public class RequestReplyTest {
 
     final World world = World.startWithDefaults("requestreply-test");
 
-    final TestUntil until = TestUntil.happenings(1);
+    final RequestReplyResults results = new RequestReplyResults();
+    final AccessSafely access = results.afterCompleting(2);
 
-    final Service service = world.actorFor(Definition.has(Server.class, Definition.NoParameters), Service.class);
-    world.actorFor(Definition.has(Client.class, Definition.parameters(service, until)), Consumer.class);
+    final Service service = world.actorFor(Service.class, Server.class);
+    world.actorFor(Consumer.class, Client.class, service, results);
 
-    until.completes();
+    Assert.assertEquals(1, (int) access.readFrom("afterReplyReceivedCount"));
+    Assert.assertEquals(1, (int) access.readFrom("afterQueryPerformedCount"));
 
     System.out.println("RequestReply: is completed.");
   }

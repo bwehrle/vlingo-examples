@@ -7,11 +7,11 @@
 
 package io.vlingo.reactive.messaging.patterns.returnaddress;
 
+import org.junit.Assert;
 import org.junit.Test;
 
-import io.vlingo.actors.Definition;
 import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
+import io.vlingo.actors.testkit.AccessSafely;
 
 public class ReturnAddressTest {
   @Test
@@ -20,12 +20,14 @@ public class ReturnAddressTest {
 
     final World world = World.startWithDefaults("returnaddress-test");
 
-    final TestUntil until = TestUntil.happenings(1);
+    final ReturnAddressResults results = new ReturnAddressResults();
+    final AccessSafely access = results.afterCompleting(2);
 
-    final Service service = world.actorFor(Definition.has(Server.class, Definition.NoParameters), Service.class);
-    world.actorFor(Definition.has(Client.class, Definition.parameters(service, until)), Consumer.class);
+    final Service service = world.actorFor(Service.class, Server.class);
+    world.actorFor(Consumer.class, Client.class, service, results);
 
-    until.completes();
+    Assert.assertEquals(1, (int) access.readFrom("afterSimpleReplyCount"));
+    Assert.assertEquals(1, (int) access.readFrom("afterComplexReplyCount"));
 
     System.out.println("ReturnAddress: is completed.");
   }

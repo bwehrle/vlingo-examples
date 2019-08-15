@@ -6,13 +6,12 @@
 // one at https://mozilla.org/MPL/2.0/.
 package io.vlingo.reactive.messaging.patterns.recipientlist;
 
+import io.vlingo.actors.Actor;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import io.vlingo.actors.Actor;
-import io.vlingo.actors.testkit.TestUntil;
 
 /**
  * MountainSuppliesOrderProcessor maintains registry of @{@link QuoteProcessor} {@link Actor} instances
@@ -22,14 +21,12 @@ public class MountainSuppliesOrderProcessor
 extends Actor 
 implements OrderProcessor
 {
-    public final TestUntil until;
-    public final TestUntil untilRegistered;
+    public final RecipientListResults results;
     public final Map<String, PriceQuoteInterest> interestRegistry;
     
-    public MountainSuppliesOrderProcessor( TestUntil until, TestUntil untilRegistered )
+    public MountainSuppliesOrderProcessor( final RecipientListResults results )
     {
-        this.until = until;
-        this.untilRegistered = untilRegistered;
+        this.results = results;
         this.interestRegistry = new HashMap<>();
     }
 
@@ -37,9 +34,9 @@ implements OrderProcessor
     @Override
     public void register( PriceQuoteInterest interest )
     {
-        logger().log( String.format( "%s interested", interest.type ));
+        logger().debug( String.format( "%s interested", interest.type ));
         interestRegistry.put( interest.type, interest );
-        untilRegistered.happened();
+        results.access.writeUsing("afterProcessorRegistered", 1);
     }
 
     /* @see io.vlingo.reactive.messaging.patterns.recipientlist.OrderProcessor#requestForQuote(io.vlingo.reactive.messaging.patterns.recipientlist.RetailBasket) */
@@ -54,8 +51,8 @@ implements OrderProcessor
     @Override
     public void remittedPriceQuote( PriceQuote quote )
     {
-        logger().log( String.format( "OrderProcessor received price quote: %s", quote ));
-        until.happened();
+        logger().debug( String.format( "OrderProcessor received price quote: %s", quote ));
+        results.access.writeUsing("afterQuotationRemitted", 1);
     }
 
     protected List<QuoteProcessor> calculateRecipientList( RetailBasket basket )

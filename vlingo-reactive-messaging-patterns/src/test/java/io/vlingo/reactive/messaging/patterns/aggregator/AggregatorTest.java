@@ -9,12 +9,12 @@ package io.vlingo.reactive.messaging.patterns.aggregator;
 
 import java.util.Arrays;
 
+import org.junit.Assert;
 import org.junit.Test;
 
-import io.vlingo.actors.Definition;
 import io.vlingo.actors.Protocols;
 import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
+import io.vlingo.actors.testkit.AccessSafely;
 import io.vlingo.reactive.messaging.patterns.aggregator.RequestForQuotationProcessor.RequestForQuotation;
 import io.vlingo.reactive.messaging.patterns.aggregator.RequestForQuotationProcessor.RetailItem;
 import io.vlingo.reactive.messaging.patterns.aggregator.quotes.BudgetHikersPriceQuotesActor;
@@ -30,28 +30,29 @@ public class AggregatorTest {
 
     final World world = World.startWithDefaults("aggregator-test");
 
-    final TestUntil until = TestUntil.happenings(1);
+    final AggregatorResults results = new AggregatorResults();
+
+    final AccessSafely access = results.afterCompleting(5);
 
     final Protocols protocols =
             world.actorFor(
-                    Definition.has(
-                            MountaineeringSuppliesOrderProcessor.class,
-                            Definition.parameters(until)),
                     new Class[] { RequestForQuotationProcessor.class,
-                                  RequestForQuotationSupplier.class,
-                                  PriceQuotesFulfillmentWatcher.class });
+                        RequestForQuotationSupplier.class,
+                        PriceQuotesFulfillmentWatcher.class },
+                    MountaineeringSuppliesOrderProcessor.class,
+                    results);
 
     final Protocols.Three<RequestForQuotationProcessor, RequestForQuotationSupplier, PriceQuotesFulfillmentWatcher> three = Protocols.three(protocols);
     final RequestForQuotationProcessor processor = three._1;
     final RequestForQuotationSupplier supplier = three._2;
 
-    world.actorFor(Definition.has(PriceQuoteAggregatorActor.class, Definition.parameters(three._3)), PriceQuoteAggregator.class);
+    world.actorFor(PriceQuoteAggregator.class, PriceQuoteAggregatorActor.class, three._3);
 
-    world.actorFor(Definition.has(BudgetHikersPriceQuotesActor.class, Definition.parameters(supplier)), PriceQuotes.class);
-    world.actorFor(Definition.has(HighSierraPriceQuotesActor.class, Definition.parameters(supplier)), PriceQuotes.class);
-    world.actorFor(Definition.has(MountainAscentPriceQuotesActor.class, Definition.parameters(supplier)), PriceQuotes.class);
-    world.actorFor(Definition.has(PinnacleGearPriceQuotesActor.class, Definition.parameters(supplier)), PriceQuotes.class);
-    world.actorFor(Definition.has(RockBottomOuterwearPriceQuotesActor.class,Definition.parameters(supplier)), PriceQuotes.class);
+    world.actorFor(PriceQuotes.class, BudgetHikersPriceQuotesActor.class, supplier);
+    world.actorFor(PriceQuotes.class, HighSierraPriceQuotesActor.class, supplier);
+    world.actorFor(PriceQuotes.class, MountainAscentPriceQuotesActor.class, supplier);
+    world.actorFor(PriceQuotes.class, PinnacleGearPriceQuotesActor.class, supplier);
+    world.actorFor(PriceQuotes.class, RockBottomOuterwearPriceQuotesActor.class,supplier);
 
     processor.requestPriceQuotationFor(
             new RequestForQuotation(
@@ -97,7 +98,7 @@ public class AggregatorTest {
                             new RetailItem("18", 249.95),
                             new RetailItem("19", 789.99))));
 
-    until.completes();
+    Assert.assertEquals(5, (int) access.readFrom("afterQuotationFulfillmentCount"));
 
     System.out.println("Aggregator: is completed.");
   }

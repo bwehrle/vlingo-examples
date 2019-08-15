@@ -8,7 +8,7 @@
 package io.vlingo.eventjournal.counter.events;
 
 import io.vlingo.common.serialization.JsonSerialization;
-import io.vlingo.symbio.Entry.TextEntry;
+import io.vlingo.symbio.BaseEntry.TextEntry;
 import io.vlingo.symbio.EntryAdapter;
 import io.vlingo.symbio.Metadata;
 
@@ -17,12 +17,17 @@ public class CounterIncreasedAdapter implements EntryAdapter<CounterIncreased, T
 
     @Override
     public CounterIncreased fromEntry(TextEntry entry) {
-      return JsonSerialization.deserialized(entry.entryData, CounterIncreased.class);
+      return JsonSerialization.deserialized(entry.entryData(), CounterIncreased.class);
     }
-
+    
     @Override
-    public TextEntry toEntry(CounterIncreased source) {
+    public TextEntry toEntry(final CounterIncreased source, final Metadata metadata) {
+      return toEntry(source, source.uuid.toString());
+    }
+    
+    @Override
+    public TextEntry toEntry(final CounterIncreased source, final String id, final Metadata metadata) {
       final String serialization = JsonSerialization.serialized(source);
-      return new TextEntry(CounterIncreased.class, 1, serialization, Metadata.nullMetadata());
+      return new TextEntry(id, CounterIncreased.class, 1, serialization, metadata);
     }
 }

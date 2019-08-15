@@ -5,6 +5,10 @@
 // was not distributed with this file, You can obtain
 // one at https://mozilla.org/MPL/2.0/.
 package io.vlingo.reactive.messaging.patterns.competingconsumer;
+import org.junit.Assert;
+import org.junit.Test;
+
+import io.vlingo.actors.World;
 /**
  * CompetingConsumerTest demonstrates the competing consumers
  * pattern utilizing a {@link Router} with a {@link RoundRobinRoutingStrategy}.
@@ -13,11 +17,7 @@ package io.vlingo.reactive.messaging.patterns.competingconsumer;
  * any of which might be asked to consume the {@link WorkItem} at the
  * determination of the {@link Router}.
  */
-import org.junit.Test;
-
-import io.vlingo.actors.Definition;
-import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
+import io.vlingo.actors.testkit.AccessSafely;
 
 public class CompetingConsumerTest {
 
@@ -26,15 +26,15 @@ public class CompetingConsumerTest {
     final World world = World.startWithDefaults("competing-consumer-test");
     final int poolSize = 4;
     final int messagesToSend = 8;
-    final TestUntil until = TestUntil.happenings(messagesToSend);
-    final WorkConsumer workConsumer = world.actorFor(
-            Definition.has(WorkRouterActor.class, Definition.parameters(poolSize, until)),
-            WorkConsumer.class);
-    
+    final CompetingConsumerResults results = new CompetingConsumerResults();
+    final WorkConsumer workConsumer =
+            world.actorFor(WorkConsumer.class, WorkRouterActor.class, poolSize, results);
+
     for (int i = 0; i < messagesToSend; i++) {
       workConsumer.consumeWork(new WorkItem(i));
     }
-    
-    until.completes();
+
+    final AccessSafely access = results.afterCompleting(messagesToSend);
+    Assert.assertEquals(8, (int) access.readFrom("afterItemConsumedCount"));
   }
 }

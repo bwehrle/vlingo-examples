@@ -8,6 +8,7 @@
 package com.saasovation.collaboration.model.forum;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import org.junit.Test;
 
@@ -25,54 +26,66 @@ public class DiscussionTest extends EntityTest {
   private Fixtures fixtures = new Fixtures();
 
   @Test
-  public void testThatDiscussionClosed() {
-    final Tuple2<DiscussionId, Discussion> discussionPair = fixtures.discussionFixture(world, journalListener);
-    this.journalListener.until = until(1);
+  public void testThatDiscussionCloses() {
+    System.out.println("=========== testThatDiscussionClosed ===========");
+    final Tuple2<DiscussionId, Discussion> discussionPair = fixtures.discussionFixture(world);
+    journalDispatcher.afterCompleting(1);
     discussionPair._2.close();
-    journalListener.until.completes();
-    assertEquals(3, journalListener.confirmExpectedEntries(3, 10));
-    final DiscussionClosed event2 = adapter().asSource(journalListener.allEntries.get(2));
+    final int count = journalDispatcher.confirmedCount(3);
+    assertEquals(3, count);
+    final DiscussionClosed event2 = adapter().asSource(journalDispatcher.entry(2));
     assertEquals(DiscussionClosed.class, event2.getClass());
   }
 
   @Test
   public void testThatDiscussionReopened() {
-    final Tuple2<DiscussionId, Discussion> discussionPair = fixtures.discussionFixture(world, journalListener);
-    this.journalListener.until = until(2);
+    System.out.println("=========== testThatDiscussionReopened ===========");
+    final Tuple2<DiscussionId, Discussion> discussionPair = fixtures.discussionFixture(world);
+    journalDispatcher.afterCompleting(2);
     discussionPair._2.close();
     discussionPair._2.reopen();
-    journalListener.until.completes();
-    assertEquals(4, journalListener.confirmExpectedEntries(4, 10));
-    final DiscussionClosed event2 = adapter().asSource(journalListener.allEntries.get(2));
+    final int count = journalDispatcher.confirmedCount(4);
+    assertEquals(4, count);
+    final DiscussionClosed event2 = adapter().asSource(journalDispatcher.entry(2));
     assertEquals(DiscussionClosed.class, event2.getClass());
-    final DiscussionReopened event3 = adapter().asSource(journalListener.allEntries.get(3));
+    final DiscussionReopened event3 = adapter().asSource(journalDispatcher.entry(3));
     assertEquals(DiscussionReopened.class, event3.getClass());
   }
 
   @Test
   public void testThatDiscussionTopicChanged() {
-    final Tuple2<DiscussionId, Discussion> discussionPair = fixtures.discussionFixture(world, journalListener);
-    this.journalListener.until = until(1);
+    System.out.println("=========== testThatDiscussionTopicChanged ===========");
+    final Tuple2<DiscussionId, Discussion> discussionPair = fixtures.discussionFixture(world);
+    journalDispatcher.afterCompleting(1);
     final String topic = "By Way, Way, Way of Discussion";
     discussionPair._2.topicTo(topic);
-    journalListener.until.completes();
-    assertEquals(3, journalListener.confirmExpectedEntries(3, 10));
-    final DiscussionTopicChanged event2 = adapter().asSource(journalListener.allEntries.get(2));
+    final int count = journalDispatcher.confirmedCount(3);
+    assertEquals(3, count);
+    final DiscussionTopicChanged event2 = adapter().asSource(journalDispatcher.entry(2));
     assertEquals(DiscussionTopicChanged.class, event2.getClass());
     assertEquals(topic, event2.topic);
   }
 
   @Test
-  public void testThatDiscussionPosts() {
-    final Tuple2<DiscussionId, Discussion> discussionPair = fixtures.discussionFixture(world, journalListener);
-    this.journalListener.until = until(1);
+  public void testThatDiscussionPosts() throws Exception {
+    System.out.println("=========== testThatDiscussionPosts ===========");
+    final Tuple2<DiscussionId, Discussion> discussionPair = fixtures.discussionFixture(world);
+//    System.out.println("4b");
+    journalDispatcher.afterCompleting(1);
+//    System.out.println("4c");
     final Author author = Author.unique();
     final String subject = "Within the discussion a post";
     final String bodyText = "This is the body of the post which is document text.";
-    discussionPair._2.postFor(author, subject, bodyText);
-    journalListener.until.completes();
-    assertEquals(3, journalListener.confirmExpectedEntries(3, 10));
-    final PostedToDiscussion event2 = postAdapter().asSource(journalListener.allEntries.get(2));
+//    System.out.println("4c.1");
+    Tuple2<PostId,Post> postPair = discussionPair._2.postFor(author, subject, bodyText).await(2000);
+//    System.out.println("4c.2");
+    assertNotNull(postPair._1);
+    assertNotNull(postPair._2);
+//    System.out.println("4d=" + journalDispatcher.confirmedCount());
+    final int count = journalDispatcher.confirmedCount(3);
+//    System.out.println("4e");
+    assertEquals(3, count);
+    final PostedToDiscussion event2 = postAdapter().asSource(journalDispatcher.entry(2));
     assertEquals(PostedToDiscussion.class, event2.getClass());
     assertEquals(author.value, event2.authorId);
     assertEquals(subject, event2.subject);

@@ -6,12 +6,12 @@
 // one at https://mozilla.org/MPL/2.0/.
 package io.vlingo.reactive.messaging.patterns.messagerouter;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import io.vlingo.actors.Actor;
-import io.vlingo.actors.Definition;
 import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
+import io.vlingo.actors.testkit.AccessSafely;
 
 /**
  * MessageRouterTest serves as simple driver for {@link AlternatingRouteProcessor} {@link Actor} delegation
@@ -25,24 +25,25 @@ public class MessageRouterTest
 
     @Test
     public void testAlternatingRouteProcessorRuns()
-    throws Exception
     {
         
         final World world = World.startWithDefaults( WORLD_NAME );
         
-        world.defaultLogger().log( "AlternatingRouteProcessor: is starting"  );
-        
-        final TestUntil until = TestUntil.happenings( ROUTES );
-        
-        final Processor messageProcessor1 = world.actorFor( Definition.has( WorkerProcessor.class, Definition.parameters( "MP One" ) ), Processor.class );
-        final Processor messageProcessor2 = world.actorFor( Definition.has( WorkerProcessor.class, Definition.parameters( "MP Two" )), Processor.class );
-        final Processor alternatingRouter = world.actorFor( Definition.has( AlternatingRouteProcessor.class, Definition.parameters( until, messageProcessor1, messageProcessor2 )), Processor.class );
+        world.defaultLogger().debug( "AlternatingRouteProcessor: is starting"  );
+
+        final MessageRouterResults results = new MessageRouterResults();
+
+        final AccessSafely access = results.afterCompleting( ROUTES );
+
+        final Processor messageProcessor1 = world.actorFor(Processor.class, WorkerProcessor.class, "MP One" );
+        final Processor messageProcessor2 = world.actorFor(Processor.class, WorkerProcessor.class, "MP Two" );
+        final Processor alternatingRouter = world.actorFor(Processor.class, AlternatingRouteProcessor.class, results, messageProcessor1, messageProcessor2 );
         
         int routeCount = 0;
         int j = 0;
         while ( true )
         {
-            int remaining = until.remaining();
+            int remaining = ROUTES - access.totalWrites();
             if ( routeCount < ROUTES )
             {
                 alternatingRouter.process( routeCount );
@@ -51,16 +52,17 @@ public class MessageRouterTest
             
             if ( j != remaining )
             {
-                world.defaultLogger().log( String.format( "Count: %d", remaining ));
+                world.defaultLogger().debug( String.format( "Count: %d", remaining ));
                 j = remaining;
             }
             
             if ( remaining == 0 ) break;
         }
+
+        Assert.assertEquals(10, (int) access.readFrom("afterMessageProcessedByFirstProcessorCount"));
+        Assert.assertEquals(10, (int) access.readFrom("afterMessageProcessedBySecondProcessorCount"));
         
-        until.completes();
-        
-        world.defaultLogger().log( "AlternatingRouteProcessor: is completed"  );
+        world.defaultLogger().debug( "AlternatingRouteProcessor: is completed"  );
         
         world.terminate();
         

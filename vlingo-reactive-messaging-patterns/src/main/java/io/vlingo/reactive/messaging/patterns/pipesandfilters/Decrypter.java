@@ -7,26 +7,25 @@
 
 package io.vlingo.reactive.messaging.patterns.pipesandfilters;
 
-import java.nio.charset.StandardCharsets;
-
 import io.vlingo.actors.Actor;
-import io.vlingo.actors.testkit.TestUntil;
+
+import java.nio.charset.StandardCharsets;
 
 public class Decrypter extends Actor implements OrderProcessor {
   private final OrderProcessor nextFilter;
-  private final TestUntil until;
+  private final PipeAndFilterResults results;
 
-  public Decrypter(final OrderProcessor nextFilter, final TestUntil until) {
+  public Decrypter(final OrderProcessor nextFilter, final PipeAndFilterResults results) {
     this.nextFilter = nextFilter;
-    this.until = until;
+    this.results = results;
   }
 
   @Override
   public void processIncomingOrder(final byte[] orderInfo) {
     final String textOrderInfo = new String(orderInfo, StandardCharsets.UTF_8);
-    logger().log("Decrypter: processing: " + textOrderInfo);
+    logger().debug("Decrypter: processing: " + textOrderInfo);
     final String orderText = textOrderInfo.replace("(encryption)", "");
     nextFilter.processIncomingOrder(orderText.getBytes());
-    until.happened();
+    results.access.writeUsing("afterOrderDecryptedCount", 1);
   }
 }

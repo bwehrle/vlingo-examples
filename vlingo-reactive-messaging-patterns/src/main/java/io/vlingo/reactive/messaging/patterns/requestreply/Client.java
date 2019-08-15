@@ -8,27 +8,26 @@
 package io.vlingo.reactive.messaging.patterns.requestreply;
 
 import io.vlingo.actors.Actor;
-import io.vlingo.actors.testkit.TestUntil;
 
 public class Client extends Actor implements Consumer {
   private final Service service;
-  private final TestUntil until;
+  private final RequestReplyResults results;
 
-  public Client(final Service service, final TestUntil until) {
+  public Client(final Service service, final RequestReplyResults results) {
     this.service = service;
-    this.until = until;
+    this.results = results;
 
     service.requestFor("Request from Client-Consumer!", selfAs(Consumer.class));
   }
 
   @Override
   public void replyOf(final String what) {
-    logger().log("Consumer received request-reply of: " + what);
-    until.happened();
+    logger().debug("Consumer received request-reply of: " + what);
+    results.access.writeUsing("afterReplyReceivedCount", 1);
 
     service.query("Query from Client-Consumer!").andThenConsume(result -> {
-      logger().log("Consumer received query-reply of: " + what);
-      until.happened();
+      logger().debug("Consumer received query-reply of: " + what);
+      results.access.writeUsing("afterQueryPerformedCount", 1);
     });
   }
 }

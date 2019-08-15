@@ -6,11 +6,10 @@
 // one at https://mozilla.org/MPL/2.0/.
 package io.vlingo.reactive.messaging.patterns.scattergather;
 
+import io.vlingo.actors.Actor;
+
 import java.util.HashMap;
 import java.util.Map;
-
-import io.vlingo.actors.Actor;
-import io.vlingo.actors.testkit.TestUntil;
 
 /**
  * MountainSuppliesOrderProcessor maintains registry of @{@link QuoteProcessor} {@link Actor} instances
@@ -21,15 +20,13 @@ extends Actor
 implements OrderProcessor
 {
     public final AggregateProcessor priceQuoteAggregator;
-    public final TestUntil until;
-    public final TestUntil untilRegistered;
+    public final ScatterGatherResults results;
     public final Map<String, QuoteSubscriptionRequest> subscribers;
     
-    public MountainSuppliesOrderProcessor( AggregateProcessor aggregator, TestUntil until, TestUntil untilRegistered )
+    public MountainSuppliesOrderProcessor( AggregateProcessor aggregator, ScatterGatherResults results )
     {
+        this.results = results;
         this.priceQuoteAggregator = aggregator;
-        this.until = until;
-        this.untilRegistered = untilRegistered;
         this.subscribers = new HashMap<>();
     }
 
@@ -37,9 +34,9 @@ implements OrderProcessor
     @Override
     public void subscribe( QuoteSubscriptionRequest request )
     {
-        logger().log( String.format( "%s interested", request.quoteProcessor ));
+        logger().debug( String.format( "%s interested", request.quoteProcessor ));
         subscribers.put( request.quoterId, request );
-        untilRegistered.happened();
+        results.access.writeUsing("afterProcessorRegisteredCount", 1);
     }
 
     /* @see io.vlingo.reactive.messaging.patterns.recipientlist.OrderProcessor#requestForQuote(io.vlingo.reactive.messaging.patterns.recipientlist.RetailBasket) */
@@ -61,9 +58,8 @@ implements OrderProcessor
     @Override
     public void bestPriceQuotation( BestPriceQuotation bestPriceQuotation )
     {
-        logger().log( String.format( "OrderProcessor received best quotes: %s", bestPriceQuotation ) );
-        until.happened();
-        
+        logger().debug( String.format( "OrderProcessor received best quotes: %s", bestPriceQuotation ) );
+        results.access.writeUsing("afterBestPriceQuotationRegisteredCount", 1);
     }
     
     protected void dispatch( RetailBasket basket )

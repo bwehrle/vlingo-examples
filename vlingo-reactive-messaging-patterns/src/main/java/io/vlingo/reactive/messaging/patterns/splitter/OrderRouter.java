@@ -8,7 +8,6 @@ package io.vlingo.reactive.messaging.patterns.splitter;
 
 import io.vlingo.actors.Actor;
 import io.vlingo.actors.Definition;
-import io.vlingo.actors.testkit.TestUntil;
 import io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem;
 
 /**
@@ -19,24 +18,24 @@ public class OrderRouter
 extends Actor
 implements OrderProcessor
 {
-    public final TestUntil until;
+    public final SplitterResults results;
     
     protected OrderItemProcessor orderItemTypeAProcessor;
     protected OrderItemProcessor orderItemTypeBProcessor;
     protected OrderItemProcessor orderItemTypeCProcessor;
     
-    public OrderRouter( TestUntil until )
+    public OrderRouter( final SplitterResults results )
     {
-        this.until = until;
+        this.results = results;
     }
     
     /* @see io.vlingo.actors.Actor#beforeStart() */
     @Override
     protected void beforeStart()
     {
-        orderItemTypeAProcessor = childActorFor( Definition.has( OrderItemTypeAProcessor.class, Definition.parameters( until )), OrderItemProcessor.class );
-        orderItemTypeBProcessor = childActorFor( Definition.has( OrderItemTypeBProcessor.class, Definition.parameters( until ) ), OrderItemProcessor.class );
-        orderItemTypeCProcessor = childActorFor( Definition.has( OrderItemTypeCProcessor.class, Definition.parameters( until ) ), OrderItemProcessor.class );
+        orderItemTypeAProcessor = childActorFor( OrderItemProcessor.class, Definition.has( OrderItemTypeAProcessor.class, Definition.parameters( results )) );
+        orderItemTypeBProcessor = childActorFor( OrderItemProcessor.class, Definition.has( OrderItemTypeBProcessor.class, Definition.parameters( results )) );
+        orderItemTypeCProcessor = childActorFor( OrderItemProcessor.class, Definition.has( OrderItemTypeCProcessor.class, Definition.parameters( results )) );
     }
 
     /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderProcessor#placeOrder(io.vlingo.reactive.messaging.patterns.splitter.Order) */
@@ -45,7 +44,7 @@ implements OrderProcessor
     {
         for ( OrderItem item : order.orderItems.values() )
         {
-            logger().log( String.format( "OrderRouter: routing %s", item ));
+            logger().debug( String.format( "OrderRouter: routing %s", item ));
             
             switch ( item.itemType )
             {
@@ -62,45 +61,45 @@ implements OrderProcessor
                     break;
 
                 default:
-                    logger().log( String.format( "Unknown item type '%s'", item.itemType ));
+                    logger().error( String.format( "Unknown item type '%s'", item.itemType ));
                     break;
             }
         }
-        
-        until.happened();
+
+        results.access.writeUsing("afterOrderPlacedCount", 1);
     }
     
     public static final class OrderItemTypeAProcessor
     extends Actor
     implements OrderItemProcessor
     {
-        public final TestUntil until;
+        public final SplitterResults results;
         
-        public OrderItemTypeAProcessor( TestUntil until )
+        public OrderItemTypeAProcessor( final SplitterResults results )
         {
-            this.until = until;
+            this.results = results;
         }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeAItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeAItem(OrderItem orderItem)
         {
-            logger().log( String.format( "orderTypeAItem: handling %s", orderItem.toString() ));
-            until.happened();
+            logger().debug( String.format( "orderTypeAItem: handling %s", orderItem.toString() ));
+            results.access.writeUsing("afterOrderByReceivedAProcessorCount", 1);
         }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeBItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeBItem(OrderItem orderItem)
         {
-            logger().log( "orderTypeBItem unsupported method" );
+            logger().warn( "orderTypeBItem unsupported method" );
         }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeCItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeCItem(OrderItem orderItem)
         {
-            logger().log( "orderTypeCItem unsupported method" );
+            logger().warn( "orderTypeCItem unsupported method" );
         }
         
     }
@@ -109,33 +108,33 @@ implements OrderProcessor
     extends Actor
     implements OrderItemProcessor
     {
-        public final TestUntil until;
+        public final SplitterResults results;
         
-        public OrderItemTypeBProcessor( TestUntil until )
+        public OrderItemTypeBProcessor( final SplitterResults results )
         {
-            this.until = until;
+            this.results = results;
         }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeAItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeAItem(OrderItem orderItem)
         {
-            logger().log( "orderTypeAItem unsupported method" );
+            logger().warn( "orderTypeAItem unsupported method" );
        }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeBItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeBItem(OrderItem orderItem)
         {
-            logger().log( String.format( "orderTypeBItem: handling %s", orderItem.toString() ));
-            until.happened();
+            logger().debug( String.format( "orderTypeBItem: handling %s", orderItem.toString() ));
+            results.access.writeUsing("afterOrderByReceivedBProcessorCount", 1);
         }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeCItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeCItem(OrderItem orderItem)
         {
-            logger().log( "orderTypeCItem unsupported method" );
+            logger().warn( "orderTypeCItem unsupported method" );
         }
         
     }
@@ -144,33 +143,33 @@ implements OrderProcessor
     extends Actor
     implements OrderItemProcessor
     {
-        public final TestUntil until;
+        public final SplitterResults results;
         
-        public OrderItemTypeCProcessor( TestUntil until )
+        public OrderItemTypeCProcessor( final SplitterResults results )
         {
-            this.until = until;
+            this.results = results;
         }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeAItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeAItem(OrderItem orderItem)
         {
-            logger().log( "orderTypeAItem unsupported method" );
+            logger().warn( "orderTypeAItem unsupported method" );
         }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeBItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeBItem(OrderItem orderItem)
         {
-            logger().log( "orderTypeBItem unsupported method" );
+            logger().warn( "orderTypeBItem unsupported method" );
         }
 
         /* @see io.vlingo.reactive.messaging.patterns.splitter.OrderRouter.OrderItemProcessor#orderTypeCItem(io.vlingo.reactive.messaging.patterns.splitter.Order.OrderItem) */
         @Override
         public void orderTypeCItem(OrderItem orderItem)
         {
-            logger().log( String.format( "orderTypeCItem: handling %s", orderItem.toString() ));
-            until.happened();
+            logger().debug( String.format( "orderTypeCItem: handling %s", orderItem.toString() ));
+            results.access.writeUsing("afterOrderByReceivedCProcessorCount", 1);
         }
         
     }

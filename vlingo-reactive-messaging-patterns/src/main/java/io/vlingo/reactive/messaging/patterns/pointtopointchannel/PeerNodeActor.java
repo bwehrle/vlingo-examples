@@ -7,7 +7,6 @@
 package io.vlingo.reactive.messaging.patterns.pointtopointchannel;
 
 import io.vlingo.actors.Actor;
-import io.vlingo.actors.testkit.TestUntil;
 
 /**
  * PeerNodeActor represents point-to-point messaging that underlies all {@link Actor} communication where
@@ -17,22 +16,22 @@ public class PeerNodeActor
 extends Actor
 implements PointToPointProcessor
 {
-    private final TestUntil testUntil;
+    private final PointToPointResults results;
     private int lastOrderedMessageId = 0;
     
-    public PeerNodeActor( TestUntil testUntil )
+    public PeerNodeActor( final PointToPointResults results )
     {
-        this.testUntil = testUntil;
+        this.results = results;
     }
 
     /* @see io.vlingo.reactive.messaging.patterns.pointtopointchannel.PointToPointProcessor#peerMessage(java.lang.String) */
     @Override
     public void process( Integer messageId )
     {
-        logger().log( String.format( "peerMessage %d received", messageId ));
+        logger().debug( String.format( "peerMessage %d received", messageId ));
         if ( messageId < lastOrderedMessageId ) throw new IllegalStateException( "Message id out of order" );
         lastOrderedMessageId = messageId;
-        testUntil.happened();
+        results.access.writeUsing("afterMessageProcessedCount", 1);
     }
 
 }

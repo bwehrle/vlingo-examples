@@ -6,11 +6,11 @@
 // one at https://mozilla.org/MPL/2.0/.
 package io.vlingo.reactive.messaging.patterns.messageexpiration;
 
+import org.junit.Assert;
 import org.junit.Test;
 
-import io.vlingo.actors.Definition;
 import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
+import io.vlingo.actors.testkit.AccessSafely;
 
 /**
  * MessageExpirationTest
@@ -24,20 +24,23 @@ public class MessageExpirationTest
     public void testMessageExpirationRuns()
     {
         World world = World.startWithDefaults( WORLD_NAME );
-        world.defaultLogger().log( "MessageExpirationTest: is started" );
+        world.defaultLogger().debug( "MessageExpirationTest: is started" );
+
+        final MessageExpirationResults results = new MessageExpirationResults();
+        final AccessSafely access = results.afterCompleting( ORDERS );
         
-        TestUntil until = TestUntil.happenings( ORDERS );
-        
-        OrderProcessor purchaseAgent = world.actorFor( Definition.has( PurchaseAgent.class, Definition.parameters( until )), OrderProcessor.class );
-        OrderProcessor purchaseRouter = world.actorFor( Definition.has( PurchaseRouter.class, Definition.parameters( purchaseAgent )), OrderProcessor.class );
+        OrderProcessor purchaseAgent = world.actorFor(OrderProcessor.class, PurchaseAgent.class, results);
+        OrderProcessor purchaseRouter = world.actorFor(OrderProcessor.class, PurchaseRouter.class, purchaseAgent);
         
         purchaseRouter.placeOrder( new Order( "1", "11", 50.00, 1000L ));
         purchaseRouter.placeOrder( new Order( "2", "22", 250.00, 100L ));
         purchaseRouter.placeOrder( new Order( "3", "33", 32.95, 10L ));
-        
-        until.completes();
-        
-        world.defaultLogger().log( "MessageExpirationTest: is completed" );
+
+        final int expectedOrderPlaced = ORDERS - (int) access.readFrom("afterOrderExpiredCount");
+
+        Assert.assertEquals(expectedOrderPlaced, (int) access.readFrom("afterOrderPlacedCount"));
+
+        world.defaultLogger().debug( "MessageExpirationTest: is completed" );
         
         world.terminate();
     }

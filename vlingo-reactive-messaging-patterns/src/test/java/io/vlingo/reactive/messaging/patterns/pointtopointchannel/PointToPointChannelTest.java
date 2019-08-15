@@ -6,12 +6,12 @@
 // one at https://mozilla.org/MPL/2.0/.
 package io.vlingo.reactive.messaging.patterns.pointtopointchannel;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import io.vlingo.actors.Actor;
-import io.vlingo.actors.Definition;
 import io.vlingo.actors.World;
-import io.vlingo.actors.testkit.TestUntil;
+import io.vlingo.actors.testkit.AccessSafely;
 
 /**
  * PointToPointChannelTest demonstrates that {@link Actor} communication is naturally point-to-point
@@ -32,20 +32,22 @@ public class PointToPointChannelTest
     {
         final World world = World.startWithDefaults( WORLD_NAME );
         
-        world.defaultLogger().log( "PointToPointChannel: is starting" );
+        world.defaultLogger().debug( "PointToPointChannel: is starting" );
         
-        final TestUntil until = TestUntil.happenings( NUMBER_MESSAGES );
+        final PointToPointResults results = new PointToPointResults();
+
+        final AccessSafely access = results.afterCompleting( NUMBER_MESSAGES );
         
-        final PointToPointProcessor peerNodeActor = world.actorFor( Definition.has( PeerNodeActor.class, Definition.parameters( until )), PointToPointProcessor.class );
+        final PointToPointProcessor peerNodeActor = world.actorFor(PointToPointProcessor.class, PeerNodeActor.class, results);
         
         peerNodeActor.process( MSG_ID_1 );
         peerNodeActor.process( MSG_ID_2 );
         peerNodeActor.process( MSG_ID_3 );
         peerNodeActor.process( MSG_ID_4 );
+
+        Assert.assertEquals(NUMBER_MESSAGES.intValue(), (int) access.readFrom("afterMessageProcessedCount"));
         
-        until.completes();
-        
-        world.defaultLogger().log( "PointToPointChannel: is completed" );
+        world.defaultLogger().debug( "PointToPointChannel: is completed" );
         
         world.terminate();
         

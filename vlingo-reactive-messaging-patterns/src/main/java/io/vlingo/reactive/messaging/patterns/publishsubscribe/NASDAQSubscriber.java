@@ -10,20 +10,19 @@ package io.vlingo.reactive.messaging.patterns.publishsubscribe;
 import io.vlingo.actors.Actor;
 import io.vlingo.actors.pubsub.Message;
 import io.vlingo.actors.pubsub.Subscriber;
-import io.vlingo.actors.testkit.TestUntil;
 
 public class NASDAQSubscriber extends Actor implements Subscriber<PriceQuoted> {
 
-    private final TestUntil until;
+    private final MarketQuotationResults results;
 
-    public NASDAQSubscriber(final TestUntil until) {
-        this.until = until;
+    public NASDAQSubscriber(final MarketQuotationResults results) {
+        this.results = results;
     }
     
     /* @see io.vlingo.actors.pubsub.Subscriber#receive(io.vlingo.actors.pubsub.Message) */
     @Override
-    public void receive(Message message) {
-      logger().log("NASDAQSubscriber received " + message);
-      until.happened();
+    public void receive(final Message message) {
+        logger().debug("NASDAQSubscriber received " + message);
+        results.access.writeUsing("afterQuotationReceivedAtNASDAQSubscriberCount", 1);
     }
 }
