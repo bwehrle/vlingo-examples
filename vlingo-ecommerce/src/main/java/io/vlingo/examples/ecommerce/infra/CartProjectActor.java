@@ -9,10 +9,16 @@ package io.vlingo.examples.ecommerce.infra;
 
 import io.vlingo.actors.Actor;
 import io.vlingo.common.Outcome;
+import io.vlingo.examples.ecommerce.model.Cart;
+import io.vlingo.examples.ecommerce.model.CartEvents;
+import io.vlingo.examples.ecommerce.model.CartUserSummaryData;
+import io.vlingo.examples.ecommerce.model.OrderEvents;
 import io.vlingo.lattice.model.projection.Projectable;
 import io.vlingo.lattice.model.projection.Projection;
 import io.vlingo.lattice.model.projection.ProjectionControl;
 import io.vlingo.lattice.model.projection.ProjectionControl.Confirmer;
+import io.vlingo.symbio.BaseEntry;
+import io.vlingo.symbio.Entry;
 import io.vlingo.symbio.Metadata;
 import io.vlingo.symbio.Source;
 import io.vlingo.symbio.store.Result;
@@ -21,6 +27,7 @@ import io.vlingo.symbio.store.state.StateStore;
 import io.vlingo.symbio.store.state.StateStore.ReadResultInterest;
 import io.vlingo.symbio.store.state.StateStore.WriteResultInterest;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -32,48 +39,63 @@ public class CartProjectActor extends Actor
   private final ReadResultInterest readInterest;
   private final WriteResultInterest writeInterest;
   private final StateStore store;
+  private EventAdapter<CartEvents.CreatedForUser> createdEventAdapter;
+  private EventAdapter<CartEvents.AllItemsRemovedEvent> allItemsRemovedAdapter;
+  private EventAdapter<CartEvents.ProductQuantityChangeEvent> productQuantityChangedAdapter;
 
   public CartProjectActor() {
     this.store = CartQueryProvider.instance().store;
     this.readInterest = selfAs(ReadResultInterest.class);
     this.writeInterest = selfAs(WriteResultInterest.class);
+
+    this.createdEventAdapter = new EventAdapter<>(CartEvents.CreatedForUser.class);
+    this.allItemsRemovedAdapter = new EventAdapter<>(CartEvents.AllItemsRemovedEvent.class);
+    this.productQuantityChangedAdapter = new EventAdapter<>(CartEvents.ProductQuantityChangeEvent.class);
   }
 
   @Override
   public void projectWith(final Projectable projectable, final ProjectionControl control) {
+    Collection<Entry<?>> entries = projectable.entries();
+    for (Entry<?> entry : entries) {
 
-
-    final Object projectedObject = projectable.object();
-    logger().info("Projecting type %s", projectedObject.getClass());
-    //final UserData current = UserData.from(state);
-    /*
-    switch (projectable.becauseOf()) {
-      case "User:new": {
-        store.write(state.id, current, 1, writeInterest, control.confirmerFor(projectable));
-        break;
+      if (entry.type().equals(CartEvents.CreatedForUser.class.getTypeName())) {
+        CartEvents.CreatedForUser event = createdEventAdapter.fromEntry((BaseEntry.TextEntry) entry);
+        CartUserSummaryData summaryData = new CartUserSummaryData(event.userId.getId(),
+                                                                  event.cartId,
+                                                                  "0");
+        Confirmer confirmer = control.confirmerFor(projectable);
+        store.write(summaryData.userId, summaryData, projectable.dataVersion(), writeInterest, confirmer);
       }
-      case "User:contact": {
-        final Consumer<UserData> updater = previous -> {
-          updateWith(previous, current, state.version,
-            (writeData) -> UserData.from(writeData.id, writeData.nameData, current.contactData, writeData.publicSecurityToken),
-            control.confirmerFor(projectable)
-          );
+
+      else if (entry.type().equals(CartEvents.AllItemsRemovedEvent.class.getTypeName())) {
+        CartEvents.AllItemsRemovedEvent event = allItemsRemovedAdapter.fromEntry((BaseEntry.TextEntry) entry);
+        CartUserSummaryData summaryData = new CartUserSummaryData(event.userId.getId(),
+                                                                  event.cartId,
+                                                                  "0");
+        Confirmer confirmer = control.confirmerFor(projectable);
+        store.write(summaryData.userId, summaryData, projectable.dataVersion(), writeInterest, confirmer);
+      }
+
+      else if (entry.type().equals(CartEvents.ProductQuantityChangeEvent.class.getTypeName())) {
+        final CartEvents.ProductQuantityChangeEvent event = productQuantityChangedAdapter.fromEntry((BaseEntry.TextEntry) entry);
+
+        final Function<CartUserSummaryData, CartUserSummaryData> updateFunction = (previous) -> {
+          int cartItems = Integer.parseInt(previous.numberOfItems);
+          return  CartUserSummaryData.from(previous.userId,
+                                           previous.cartId,
+                                           Integer.toString(cartItems - event.quantityChange));
         };
-        store.read(current.id, UserData.class, readInterest, updater);
-        break;
-      }
-      case "User:name": {
-        final Consumer<UserData> updater = previous -> {
-          updateWith(previous, current, state.version,
-            (writeData) -> UserData.from(writeData.id, current.nameData, writeData.contactData, writeData.publicSecurityToken),
-            control.confirmerFor(projectable)
-          );
-        };
-        store.read(current.id, UserData.class, readInterest, updater);
-        break;
-      }
-    }*/
 
+        final Consumer<CartUserSummaryData> updater = previous -> {
+          updateWith(previous,
+                     updateFunction,
+                     projectable.dataVersion(),
+                     control.confirmerFor(projectable));
+        };
+        store.read(event.userId.getId(), CartUserSummaryData.class, readInterest, updater);
+      }
+
+    }
   }
 
   @Override
@@ -101,10 +123,13 @@ public class CartProjectActor extends Actor
     });
   }
 
-  /*
-  private void updateWith(final UserData previous, final UserData current, final int version, final Function<UserData,UserData> updater, final Confirmer confirmer) {
-    final UserData data = updater.apply(previous);
-    store.write(data.id, data, version, writeInterest, confirmer);
+
+  private void updateWith(final CartUserSummaryData previous,
+                          final Function<CartUserSummaryData,CartUserSummaryData> updater,
+                          final int version,
+                          final Confirmer confirmer) {
+    final CartUserSummaryData data = updater.apply(previous);
+    store.write(data.userId, data, version, writeInterest, confirmer);
   }
-   */
+
 }
