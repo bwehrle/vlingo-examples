@@ -2,7 +2,6 @@ package io.vlingo.examples.ecommerce.model;
 
 public class CartUserSummaryData {
 
-    public static int Version = 1;
     public final String userId;
     public final String cartId;
     public final String numberOfItems;

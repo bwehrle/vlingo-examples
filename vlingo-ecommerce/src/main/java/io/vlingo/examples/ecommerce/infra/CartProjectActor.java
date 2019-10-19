@@ -9,10 +9,8 @@ package io.vlingo.examples.ecommerce.infra;
 
 import io.vlingo.actors.Actor;
 import io.vlingo.common.Outcome;
-import io.vlingo.examples.ecommerce.model.Cart;
 import io.vlingo.examples.ecommerce.model.CartEvents;
 import io.vlingo.examples.ecommerce.model.CartUserSummaryData;
-import io.vlingo.examples.ecommerce.model.OrderEvents;
 import io.vlingo.lattice.model.projection.Projectable;
 import io.vlingo.lattice.model.projection.Projection;
 import io.vlingo.lattice.model.projection.ProjectionControl;
@@ -29,13 +27,14 @@ import io.vlingo.symbio.store.state.StateStore.WriteResultInterest;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 
 public class CartProjectActor extends Actor
     implements Projection, ReadResultInterest, WriteResultInterest {
 
+  public static final int INITIAL_STATE_VERSION = 1;
   private final ReadResultInterest readInterest;
   private final WriteResultInterest writeInterest;
   private final StateStore store;
@@ -64,32 +63,34 @@ public class CartProjectActor extends Actor
                                                                   event.cartId,
                                                                   "0");
         Confirmer confirmer = control.confirmerFor(projectable);
-        store.write(summaryData.userId, summaryData, projectable.dataVersion(), writeInterest, confirmer);
+        store.write(summaryData.userId, summaryData, INITIAL_STATE_VERSION, writeInterest, confirmer);
       }
 
       else if (entry.type().equals(CartEvents.AllItemsRemovedEvent.class.getTypeName())) {
         CartEvents.AllItemsRemovedEvent event = allItemsRemovedAdapter.fromEntry((BaseEntry.TextEntry) entry);
-        CartUserSummaryData summaryData = new CartUserSummaryData(event.userId.getId(),
-                                                                  event.cartId,
-                                                                  "0");
-        Confirmer confirmer = control.confirmerFor(projectable);
-        store.write(summaryData.userId, summaryData, projectable.dataVersion(), writeInterest, confirmer);
+        final BiConsumer<CartUserSummaryData, Integer> updater = (previousValue, previousVersion) -> {
+          updateWith(previousValue,
+                     (previous) -> CartUserSummaryData.from(previous.userId, previous.cartId, "0"),
+                     previousVersion+1,
+                     control.confirmerFor(projectable));
+        };
+        store.read(event.userId.getId(), CartUserSummaryData.class, readInterest, updater);
       }
 
       else if (entry.type().equals(CartEvents.ProductQuantityChangeEvent.class.getTypeName())) {
         final CartEvents.ProductQuantityChangeEvent event = productQuantityChangedAdapter.fromEntry((BaseEntry.TextEntry) entry);
 
-        final Function<CartUserSummaryData, CartUserSummaryData> updateFunction = (previous) -> {
+        final Function<CartUserSummaryData, CartUserSummaryData> updateFunction = previous -> {
           int cartItems = Integer.parseInt(previous.numberOfItems);
           return  CartUserSummaryData.from(previous.userId,
                                            previous.cartId,
                                            Integer.toString(cartItems - event.quantityChange));
         };
 
-        final Consumer<CartUserSummaryData> updater = previous -> {
+        final BiConsumer<CartUserSummaryData, Integer> updater = (previous, previousVersion) -> {
           updateWith(previous,
                      updateFunction,
-                     projectable.dataVersion(),
+                     previousVersion+1,
                      control.confirmerFor(projectable));
         };
         store.read(event.userId.getId(), CartUserSummaryData.class, readInterest, updater);
@@ -102,7 +103,7 @@ public class CartProjectActor extends Actor
   @SuppressWarnings("unchecked")
   public <S> void readResultedIn(final Outcome<StorageException, Result> outcome, final String id, final S state, final int stateVersion, final Metadata metadata, final Object object) {
     outcome.andThen(result -> {
-      ((Consumer<S>) object).accept(state);
+      ((BiConsumer<S, Integer>) object).accept(state, stateVersion);
       return result;
     }).otherwise(cause -> {
       // log but don't retry, allowing re-delivery of Projectable
