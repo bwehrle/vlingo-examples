@@ -31,7 +31,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 
-public class CartProjectActor extends Actor
+public class CartSummaryProjectionActor extends Actor
     implements Projection, ReadResultInterest, WriteResultInterest {
 
   public static final int INITIAL_STATE_VERSION = 1;
@@ -42,7 +42,7 @@ public class CartProjectActor extends Actor
   private EventAdapter<CartEvents.AllItemsRemovedEvent> allItemsRemovedAdapter;
   private EventAdapter<CartEvents.ProductQuantityChangeEvent> productQuantityChangedAdapter;
 
-  public CartProjectActor() {
+  public CartSummaryProjectionActor() {
     this.store = CartQueryProvider.instance().store;
     this.readInterest = selfAs(ReadResultInterest.class);
     this.writeInterest = selfAs(WriteResultInterest.class);

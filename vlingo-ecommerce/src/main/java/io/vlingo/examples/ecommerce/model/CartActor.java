@@ -24,6 +24,17 @@ public class CartActor extends EventSourced implements Cart {
         return String.format("cartEvents:%s", state.cartId);
     }
 
+    @Override
+    public String snapshot() {
+        /*if (nextVersion() % 2 == 0) {
+            return this.state.toString();
+        } else {
+            return null;
+        }
+*/
+        return null;
+    }
+
     static {
         BiConsumer<CartActor, CartEvents.CreatedForUser> applyCartCreated = CartActor::applyCartCreated;
         EventSourced.registerConsumer(CartActor.class, CartEvents.CreatedForUser.class,
@@ -126,7 +137,7 @@ public class CartActor extends EventSourced implements Cart {
         int calcNewQuantityByProductId(ProductId productId, int quantityChange) {
             int quantity = basketProductsById.getOrDefault(productId, 0);
             int newQuantity = quantity + quantityChange;
-            return (newQuantity < 0) ?  0 : newQuantity;
+            return Math.max(newQuantity, 0);
         }
 
         private List<CartItem> getCartItems() {

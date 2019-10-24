@@ -37,8 +37,6 @@ public class OrderResourceShould {
     @Before
     public void setUp() {
         Bootstrap.instance(orderPortNumber);
-        // This should not be needed; see https://github.com/vlingo/vlingo-http/issues/26
-        RestAssured.defaultParser = Parser.JSON;
         Boolean startUpSuccess = Bootstrap.instance().serverStartup().await(100);
         assertThat(startUpSuccess, is(equalTo(true)));
     }
